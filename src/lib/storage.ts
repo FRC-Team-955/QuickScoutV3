@@ -18,7 +18,9 @@ export async function changeSession(change: (current: Session) => Session): Prom
     let next: Session;
     request.onsuccess = () => {
       try {
-        next = change(request.result ?? initialSession());
+        // Additive defaults keep the first prototype's reports and draft intact.
+        const stored = request.result;
+        next = change(stored ? { ...initialSession(), ...stored } : initialSession());
         store.put(next, "current");
       } catch (error) {
         transaction.abort();

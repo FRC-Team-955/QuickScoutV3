@@ -9,7 +9,9 @@ export function useSession() {
   const writes = useRef(0);
 
   useEffect(() => {
-    changeSession(current => current).then(setSession).catch(error => setError(String(error)));
+    changeSession((current) => current)
+      .then(setSession)
+      .catch((error) => setError(String(error)));
   }, []);
 
   async function change(update: (current: Session) => Session) {

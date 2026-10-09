@@ -1,11 +1,39 @@
+import type { NexusStatus } from "./nexus";
 export type Mode = "objective" | "subjective" | "pit";
-export type Match = { id: string; number: number; teams: number[] };
+export type Match = {
+  id: string;
+  number: number;
+  teams: number[];
+  redTeams?: number[];
+  blueTeams?: number[];
+  label?: string;
+  level?: string;
+  setNumber?: number;
+  time?: number | null;
+  actualTime?: number | null;
+  redScore?: number;
+  blueScore?: number;
+  redBreakdown?: Record<string, unknown>;
+  blueBreakdown?: Record<string, unknown>;
+  manual?: boolean;
+};
+export type EventData = {
+  key: string;
+  name: string;
+  updatedAt: number;
+  matches: Match[];
+  teams: { number: number; name: string }[];
+  webcasts: { type: string; channel: string; file?: string }[];
+  officialOprs: Record<string, number>;
+  warnings: string[];
+};
 export type Draft = {
   id: string;
   mode: Mode;
   matchId: string | null;
   team: number;
   values: Record<string, string | number>;
+  eventKey?: string;
 };
 export type Report = Draft & { scoutId: string; scoutName: string; submittedAt: number };
 export type Session = {
@@ -18,6 +46,14 @@ export type Session = {
   draft: Draft | null;
   reports: Report[];
   outbox: string[];
+  eventKey: string;
+  homeTeam: number;
+  events: Record<string, EventData>;
+  absent: Record<string, number[]>;
+  language: string;
+  nexus: Record<string, NexusStatus>;
+  nexusKeys: Record<string, string>;
+  preferredMatchId?: string;
 };
 
 export const initialSession = (): Session => ({
@@ -34,34 +70,79 @@ export const initialSession = (): Session => ({
   draft: null,
   reports: [],
   outbox: [],
+  eventKey: "demo",
+  homeTeam: 955,
+  events: {},
+  absent: {},
+  language: "en",
+  nexus: {},
+  nexusKeys: {},
 });
 
 // Local suggestion only. Exclusive claims belong on the server.
 export function suggestTeam(session: Session, match: Match, mode: Mode): number | null {
-  const observed = new Set(session.reports
-    .filter(report => report.matchId === match.id && report.mode === mode)
-    .map(report => report.team));
+  if (match.teams.length !== 6 || match.teams.some((team) => !Number.isInteger(team) || team < 1))
+    return null;
+  const observed = new Set(
+    session.reports
+      .filter(
+        (report) =>
+          report.matchId === match.id &&
+          report.mode === mode &&
+          (report.eventKey ?? "demo") === session.eventKey,
+      )
+      .map((report) => report.team),
+  );
   const offset = Array.from(session.scoutId + match.id).reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const ordered = match.teams.map((_, index) => match.teams[(index + offset) % match.teams.length]);
-  return ordered.find(team => !observed.has(team)) ?? null;
+  return ordered.find((team) => !observed.has(team)) ?? null;
 }
 
 export function submitDraft(session: Session, now = Date.now()): Session {
   if (!session.draft || !session.name.trim()) throw new Error("A scout name and draft are required.");
-  const report = { ...session.draft, scoutId: session.scoutId, scoutName: session.name.trim(), submittedAt: now };
+  const report = session.reports.find((report) => report.id === session.draft!.id) ?? {
+    ...session.draft,
+    scoutId: session.scoutId,
+    scoutName: session.name.trim(),
+    submittedAt: now,
+  };
   return {
     ...session,
     draft: null,
-    reports: [...session.reports.filter(item => item.id !== report.id), report],
+    reports: [...session.reports.filter((item) => item.id !== report.id), report],
     outbox: [...new Set([...session.outbox, report.id])],
   };
 }
 
-export function teamStats(reports: Report[]) {
-  const teams = [...new Set(reports.filter(report => report.mode === "objective").map(report => report.team))];
-  return teams.map(team => {
-    const entries = reports.filter(report => report.mode === "objective" && report.team === team);
-    const average = (field: string) => entries.reduce((sum, report) => sum + Number(report.values[field] || 0), 0) / entries.length;
-    return { team, reports: entries.length, auto: average("autoFuel"), teleop: average("teleopFuel") };
-  }).sort((a, b) => b.auto + b.teleop - a.auto - a.teleop);
+export function applyEvent(session: Session, event: EventData): Session {
+  const previous = session.events[session.eventKey] ?? {
+    key: session.eventKey,
+    name: session.eventKey === "demo" ? "Demo event" : session.eventKey,
+    updatedAt: 0,
+    matches: [],
+    teams: [],
+    webcasts: [],
+    officialOprs: {},
+    warnings: [],
+  };
+  const manual =
+    session.eventKey === event.key
+      ? session.schedule.filter(
+          (match) => match.manual && !event.matches.some((item) => item.id === match.id),
+        )
+      : [];
+  const next = { ...event, matches: [...event.matches, ...manual] };
+  return {
+    ...session,
+    eventKey: event.key,
+    schedule: next.matches,
+    preferredMatchId: next.matches.some((match) => match.id === session.preferredMatchId)
+      ? session.preferredMatchId
+      : undefined,
+    events: {
+      ...session.events,
+      [session.eventKey]: { ...previous, matches: session.schedule },
+      [event.key]: next,
+    },
+  };
 }

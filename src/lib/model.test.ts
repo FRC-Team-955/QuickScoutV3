@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { suggestTeam, submitDraft, teamStats, type Session } from "./model";
+import { summarizeTeams } from "./analytics";
+import { initialSession, suggestTeam, submitDraft, type Session } from "./model";
 
 const session = (): Session => ({
-  schemaVersion: 1, scoutId: "scout-a", name: "Arin", offline: true, lastSync: null,
+  ...initialSession(),
+  schemaVersion: 1,
+  scoutId: "scout-a",
+  name: "Arin",
+  offline: true,
+  lastSync: null,
   schedule: [{ id: "qm1", number: 1, teams: [955, 749, 997, 2471, 1540, 2046] }],
-  draft: { id: "report-1", mode: "objective", matchId: "qm1", team: 955, values: { autoFuel: 5, teleopFuel: 10 } },
-  reports: [], outbox: [],
+  draft: {
+    id: "report-1",
+    mode: "objective",
+    matchId: "qm1",
+    team: 955,
+    values: { autoFuel: 5, teleopFuel: 10 },
+  },
+  reports: [],
+  outbox: [],
 });
 
 describe("local reports", () => {
@@ -32,7 +45,8 @@ describe("local reports", () => {
   });
   it("calculates fuel averages using objective reports only", () => {
     const saved = submitDraft(session());
-    expect(teamStats([...saved.reports, { ...saved.reports[0], id: "pit-1", mode: "pit" }]))
-      .toEqual([{ team: 955, reports: 1, auto: 5, teleop: 10 }]);
+    expect(summarizeTeams([...saved.reports, { ...saved.reports[0], id: "pit-1", mode: "pit" }])).toEqual([
+      expect.objectContaining({ team: 955, reports: 1, matches: 1, auto: 5, teleop: 10 }),
+    ]);
   });
 });

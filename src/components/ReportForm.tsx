@@ -3,64 +3,156 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import type { Draft } from "@/lib/model";
+import { matchFields, type Field } from "@/lib/fields";
+import { pitFields } from "@/lib/pit-fields";
+import { translate } from "@/lib/translations";
 
-type Field = { key: string; label: string; options?: string[]; count?: boolean };
-const fields: Record<Draft["mode"], Field[]> = {
-  objective: [
-    { key: "autoFuel", label: "Autonomous fuel", count: true },
-    { key: "autoClimb", label: "Auto climb", options: ["No", "Yes"] },
-    { key: "teleopFuel", label: "Teleop fuel", count: true },
-    { key: "climb", label: "Teleop climb", options: ["None", "L1", "L2", "L3"] },
-    { key: "defense", label: "Defense", options: ["None", "Poor", "Fair", "Good", "Excellent"] },
-    { key: "shootingOnMove", label: "Shooting on the move", options: ["No", "Yes"] },
-    { key: "tipped", label: "Robot tipped", options: ["No", "Yes"] },
-  ],
-  subjective: [
-    { key: "auto", label: "Autonomous effectiveness" },
-    { key: "cycle", label: "Fuel per cycle / estimated BPS" },
-    { key: "strategy", label: "Scoring, passing, and defense" },
-    { key: "cooperation", label: "Alliance cooperation" },
-    { key: "reliability", label: "Reliability and penalties" },
-    { key: "strengths", label: "Strengths" },
-    { key: "weaknesses", label: "Weaknesses" },
-  ],
-  pit: [
-    { key: "climb", label: "Climb capability", options: ["None", "L1", "L2", "L3"] },
-    { key: "shooter", label: "Shooter type / BPS" },
-    { key: "hopper", label: "Approximate fuel capacity" },
-    { key: "mobility", label: "Trench and bump capability" },
-    { key: "autos", label: "Autos and starting locations" },
-    { key: "strengths", label: "Strengths" },
-    { key: "weaknesses", label: "Weaknesses" },
-  ],
-};
-
-export default function ReportForm({ draft, update }: {
+export type ValueUpdate = string | number | ((current: string | number) => string | number);
+export default function ReportForm({
+  draft,
+  update,
+  language,
+}: {
   draft: Draft;
-  update: (key: string, value: string | number | ((current: number) => number)) => void;
+  update: (key: string, value: ValueUpdate) => void;
+  language: string;
 }) {
-  return <div className="space-y-6">
-    {fields[draft.mode].map(field => <div key={field.key} className="space-y-2">
-      <Label htmlFor={field.key}>{field.label}</Label>
-      {field.count ? <div className="flex flex-wrap items-center gap-2">
-        <Input id={field.key} className="w-24 text-xl font-mono" type="number" min={0}
-          value={draft.values[field.key] ?? 0}
-          onChange={event => update(field.key, Math.max(0, Number(event.target.value)))} />
-        {[-1, 1, 3, 5, 10].map(amount => <Button key={amount} variant="outline" type="button"
-          aria-label={`${field.label} ${amount > 0 ? "plus" : "minus"} ${Math.abs(amount)}`}
-          onClick={() => update(field.key, current => Math.max(0, current + amount))}>
-          {amount > 0 ? "+" : ""}{amount}
-        </Button>)}
-      </div> : field.options ? <select id={field.key} className="field"
-        value={draft.values[field.key] ?? ""} onChange={event => update(field.key, event.target.value)}>
-        <option value="">Choose…</option>
-        {field.options.map(option => <option key={option}>{option}</option>)}
-      </select> : <Input id={field.key} defaultValue={draft.values[field.key] ?? ""}
-        onChange={event => update(field.key, event.target.value)} />}
-    </div>)}
-    <div className="space-y-2"><Label htmlFor="notes">Notes</Label>
-      <Textarea id="notes" placeholder="Anything else worth knowing?" defaultValue={draft.values.notes ?? ""}
-        onChange={event => update("notes", event.target.value)} />
+  const pit = draft.mode === "pit";
+  const fields = draft.mode === "pit" ? pitFields : matchFields[draft.mode];
+  const t = (label: string) => (pit ? translate(label, language) : label);
+  function renderField(field: Field, prefix = "") {
+    const key = prefix + field.key;
+    const value = draft.values[key] ?? (field.type === "count" ? 0 : "");
+    return (
+      <div key={key} className="space-y-2 min-w-0">
+        <Label htmlFor={key}>{t(field.label)}</Label>
+        {field.type === "count" ? (
+          <div className="counter">
+            <Input
+              id={key}
+              type="number"
+              min={0}
+              className="counter-value"
+              value={value}
+              onChange={(event) => update(key, Math.max(0, Number(event.target.value)))}
+            />
+            <div className="counter-buttons">
+              {[-1, 1, 3, 5, 10].map((amount) => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  type="button"
+                  aria-label={`${field.label} ${amount > 0 ? "plus" : "minus"} ${Math.abs(amount)}`}
+                  onClick={() => update(key, (current) => Math.max(0, Number(current || 0) + amount))}
+                >
+                  {amount > 0 ? "+" : ""}
+                  {amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : field.type === "multi" ? (
+          <div className="flex flex-wrap gap-2">
+            {field.options?.map((option) => {
+              const selected = String(value).split(" | ").includes(option);
+              return (
+                <Button
+                  key={option}
+                  variant={selected ? "default" : "outline"}
+                  aria-pressed={selected}
+                  onClick={() =>
+                    update(key, (current) => {
+                      const options = String(current).split(" | ").filter(Boolean);
+                      return (
+                        options.includes(option)
+                          ? options.filter((item) => item !== option)
+                          : [...options, option]
+                      ).join(" | ");
+                    })
+                  }
+                >
+                  {t(option)}
+                </Button>
+              );
+            })}
+          </div>
+        ) : field.type === "select" ? (
+          <select
+            id={key}
+            className="field"
+            value={value}
+            onChange={(event) => update(key, event.target.value)}
+          >
+            <option value="">{pit ? t("selectOption") : "Choose…"}</option>
+            {field.options?.map((option) => (
+              <option key={option} value={option}>
+                {t(option)}
+              </option>
+            ))}
+          </select>
+        ) : field.type === "textarea" ? (
+          <Textarea
+            id={key}
+            value={value}
+            placeholder={t(field.placeholder ?? "")}
+            onChange={(event) => update(key, event.target.value)}
+          />
+        ) : (
+          <Input
+            id={key}
+            value={value}
+            placeholder={t(field.placeholder ?? "")}
+            onChange={(event) => update(key, event.target.value)}
+          />
+        )}
+      </div>
+    );
+  }
+  const sections = [
+    ...new Set(fields.filter((field) => field.section !== "Autos").map((field) => field.section)),
+  ];
+  const autoCount = Number(draft.values.autoCount ?? 0);
+  return (
+    <div className="space-y-6" dir={pit && language === "he" ? "rtl" : "ltr"}>
+      {sections.map((section, index) => (
+        <section key={section} className="form-section">
+          <div className="section-heading">
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <h3>{t(section)}</h3>
+          </div>
+          <div className="form-grid">
+            {fields.filter((field) => field.section === section).map((field) => renderField(field))}
+          </div>
+        </section>
+      ))}
+      {pit && (
+        <section className="form-section space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3>
+              {t("Autos")} · {autoCount}
+            </h3>
+            <Button
+              variant="outline"
+              disabled={autoCount >= 12}
+              onClick={() => update("autoCount", (current) => Number(current || 0) + 1)}
+            >
+              {t("addAuto")}
+            </Button>
+          </div>
+          {Array.from({ length: autoCount }, (_, index) => (
+            <details key={index} open className="auto-card">
+              <summary>
+                {t("Autos")} {index + 1}
+              </summary>
+              <div className="form-grid mt-4">
+                {fields
+                  .filter((field) => field.section === "Autos")
+                  .map((field) => renderField(field, `auto_${index + 1}_`))}
+              </div>
+            </details>
+          ))}
+        </section>
+      )}
     </div>
-  </div>;
+  );
 }
