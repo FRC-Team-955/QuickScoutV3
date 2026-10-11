@@ -1,19 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import {
-  BarChart3,
-  Bot,
-  ClipboardList,
-  Radio,
-  Wifi,
-  WifiOff,
-  LayoutDashboard,
-  CalendarDays,
-  Trophy,
-  MonitorPlay,
-  Zap,
-  ArrowDownToLine,
-  RefreshCw,
-} from "lucide-react";
+import { Wifi, WifiOff, ArrowDownToLine, RefreshCw } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import Todo from "./components/Todo";
@@ -29,15 +15,15 @@ import { useEvent } from "./lib/use-event";
 import { download } from "./lib/transfer";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
-  { id: "dashboard", label: "Overview", icon: LayoutDashboard },
-  { id: "scouting", label: "Scouting", icon: ClipboardList },
-  { id: "pit", label: "Pit scouting", icon: Bot },
-  { id: "matches", label: "Match schedule", icon: CalendarDays },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "opr", label: "OPR", icon: Zap },
-  { id: "leaderboard", label: "Leaderboard", icon: Trophy },
-  { id: "pit-display", label: "Pit display", icon: MonitorPlay },
-  { id: "lead", label: "Lead desk", icon: Radio },
+  { id: "dashboard", label: "Overview" },
+  { id: "scouting", label: "Scouting" },
+  { id: "pit", label: "Pit scouting" },
+  { id: "matches", label: "Match schedule" },
+  { id: "analytics", label: "Analytics" },
+  { id: "opr", label: "OPR" },
+  { id: "leaderboard", label: "Leaderboard" },
+  { id: "pit-display", label: "Pit display" },
+  { id: "lead", label: "Lead desk" },
 ];
 const route = () => {
   const hash = window.location.hash.slice(1);
@@ -65,7 +51,9 @@ export default function App() {
     return (
       <main className="shell py-12">
         <h1>QuickScout V3</h1>
-        <p role={error ? "alert" : "status"}>{error || "Opening local storage…"}</p>
+        <p role={error ? "alert" : "status"}>
+          {error || "Opening local storage…"}
+        </p>
       </main>
     );
   const page = tab.split(":")[0];
@@ -75,49 +63,34 @@ export default function App() {
   const event = source.event;
   return (
     <div className="app-frame">
-      <aside className="app-sidebar">
+      <header className="app-nav">
         <a href="#dashboard" className="brand">
-          <span className="brand-mark">
-            <Bot size={24} />
-          </span>
-          <div>
-            <strong>
-              QuickScout<span>V3</span>
-            </strong>
-            <small>SCOUT · LEARN · COMPETE</small>
-          </div>
+          QuickScout <span>V3</span>
         </a>
-        <p className="sidebar-label">Workspace</p>
         <nav aria-label="Main navigation">
           {tabs.map((item) => (
-            <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined}>
-              <item.icon size={18} />
-              <span>{item.label}</span>
-              {item.id === "scouting" && session.draft && <i />}
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              aria-current={page === item.id ? "page" : undefined}
+            >
+              {item.label}
+              {item.id === "scouting" && session.draft && (
+                <i aria-label="Draft in progress" />
+              )}
             </a>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <span className="pill">LOCAL FIRST PROTOTYPE</span>
-          <p>Reports stay on this device until the sync layer is connected.</p>
-          <small>
-            Team {session.homeTeam} · {session.eventKey}
-          </small>
-        </div>
-      </aside>
+      </header>
       <div className="app-main">
         <header className="app-header">
           <div>
             <p className="eyebrow">
               Team {session.homeTeam} · {session.eventKey}
             </p>
-            <h1>
-              {event?.name ?? "Demo event"}
-              <span className="header-version">QuickScout V3</span>
-            </h1>
+            <h1>{event?.name ?? "Demo event"}</h1>
           </div>
           <label className="scout-identity">
-            <span className="identity-avatar">{session.name.slice(0, 1).toUpperCase() || "?"}</span>
             <div>
               <small>Scout name</small>
               <Input
@@ -139,9 +112,20 @@ export default function App() {
               {network ? "Network available" : "No network"}
             </span>
             <span>Firebase: not connected</span>
-            <span>Last sync: {session.lastSync ? new Date(session.lastSync).toLocaleString() : "never"}</span>
-            <span className="pending-count">{session.outbox.length} pending</span>
-            <strong className={session.offline ? "text-amber-300" : "text-muted-foreground"}>
+            <span>
+              Last sync:{" "}
+              {session.lastSync
+                ? new Date(session.lastSync).toLocaleString()
+                : "never"}
+            </span>
+            <span className="pending-count">
+              {session.outbox.length} pending
+            </span>
+            <strong
+              className={
+                session.offline ? "text-amber-300" : "text-muted-foreground"
+              }
+            >
               {session.offline ? "Offline collection" : "Online collection"}
             </strong>
           </div>
@@ -158,7 +142,11 @@ export default function App() {
               variant="ghost"
               size="sm"
               disabled={
-                source.loading || saving || session.offline || !network || session.eventKey === "demo"
+                source.loading ||
+                saving ||
+                session.offline ||
+                !network ||
+                session.eventKey === "demo"
               }
               onClick={() => void source.refresh()}
             >
@@ -177,9 +165,21 @@ export default function App() {
             </div>
           )}
           <Suspense fallback={<p className="empty">Opening analytics…</p>}>
-            {page === "dashboard" && <Dashboard session={session} navigate={navigate} />}
-            {page === "scouting" && <Scouting session={session} change={change} saving={saving} />}
-            {page === "pit" && <Scouting key="pit" session={session} change={change} saving={saving} pit />}
+            {page === "dashboard" && (
+              <Dashboard session={session} navigate={navigate} />
+            )}
+            {page === "scouting" && (
+              <Scouting session={session} change={change} saving={saving} />
+            )}
+            {page === "pit" && (
+              <Scouting
+                key="pit"
+                session={session}
+                change={change}
+                saving={saving}
+                pit
+              />
+            )}
             {page === "matches" && <Matches session={session} />}
             {page === "analytics" && (
               <Analytics
@@ -192,17 +192,25 @@ export default function App() {
             )}
             {page === "opr" && <OPR session={session} change={change} />}
             {page === "leaderboard" && <Leaderboard session={session} />}
-            {page === "pit-display" && <PitDisplay session={session} change={change} network={network} />}
+            {page === "pit-display" && (
+              <PitDisplay session={session} change={change} network={network} />
+            )}
             {page === "lead" && (
-              <Lead session={session} change={change} source={source} network={network} saving={saving} />
+              <Lead
+                session={session}
+                change={change}
+                source={source}
+                network={network}
+                saving={saving}
+              />
             )}
           </Suspense>
           <section className="backup-strip">
             <div>
-              <strong>Keep a copy with you.</strong>
+              <strong>Local reports</strong>
               <p>
-                {saving ? "Saving changes…" : "Local storage ready"} · {session.reports.length} reports on
-                this device
+                {saving ? "Saving changes…" : "Local storage ready"} ·{" "}
+                {session.reports.length} reports on this device
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -212,7 +220,11 @@ export default function App() {
                 onClick={() => {
                   download(
                     `quickscout-${session.scoutId.slice(0, 8)}.json`,
-                    JSON.stringify({ schemaVersion: 1, reports: session.reports }, null, 2),
+                    JSON.stringify(
+                      { schemaVersion: 1, reports: session.reports },
+                      null,
+                      2,
+                    ),
                   );
                   setMessage("Backup exported. Upload status is unchanged.");
                 }}
@@ -223,7 +235,11 @@ export default function App() {
               <Button
                 variant="outline"
                 disabled={!session.outbox.length}
-                onClick={() => setMessage("Firebase upload is TODO. Your reports remain queued locally.")}
+                onClick={() =>
+                  setMessage(
+                    "Firebase upload is TODO. Your reports remain queued locally.",
+                  )
+                }
               >
                 Sync pending reports
               </Button>
@@ -236,7 +252,8 @@ export default function App() {
           </section>
           <div className="grid gap-3 lg:grid-cols-2">
             <Todo title="Firebase auth & durable sync">
-              Sign-in, report batches, retry acknowledgments, and server permissions.
+              Sign-in, report batches, retry acknowledgments, and server
+              permissions.
             </Todo>
             <Todo title="Offline app startup">
               Cache the app shell and apply updates between scouting sessions.
@@ -244,7 +261,7 @@ export default function App() {
           </div>
           <footer className="app-footer">
             <span>QuickScout V3</span>
-            <span>Built for the stands. Designed around local data.</span>
+            <span>Prototype · saved on this device</span>
           </footer>
         </main>
       </div>

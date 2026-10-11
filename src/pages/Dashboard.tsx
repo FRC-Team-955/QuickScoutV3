@@ -19,29 +19,39 @@ export default function Dashboard({
   const event = session.events[session.eventKey];
   const matches = session.schedule;
   const completed = matches.filter(played);
-  const totalTeams = event?.teams.length || new Set(matches.flatMap((match) => match.teams)).size;
+  const totalTeams =
+    event?.teams.length ||
+    new Set(matches.flatMap((match) => match.teams)).size;
   const upcoming = matches.filter((match) => !played(match)).slice(0, 6);
   const allianceAverage = (side: "red" | "blue") =>
     completed.length
-      ? completed.reduce((sum, match) => sum + (side === "red" ? match.redScore! : match.blueScore!), 0) /
-        completed.length
+      ? completed.reduce(
+          (sum, match) =>
+            sum + (side === "red" ? match.redScore! : match.blueScore!),
+          0,
+        ) / completed.length
       : 0;
   const breakdownAverage = (side: "red" | "blue", field: string) => {
     const values = completed
-      .map((match) => (side === "red" ? match.redBreakdown : match.blueBreakdown)?.[field])
+      .map(
+        (match) =>
+          (side === "red" ? match.redBreakdown : match.blueBreakdown)?.[field],
+      )
       .filter((value): value is number => typeof value === "number");
-    return values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : "—";
+    return values.length
+      ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(
+          1,
+        )
+      : "—";
   };
   return (
     <div className="space-y-6">
       <div className="overview-hero">
         <div>
-          <p className="eyebrow">Event overview · {session.eventKey}</p>
-          <h2>A clearer view of the field.</h2>
-          <p>Scouting coverage, team performance, and the next matches.</p>
+          <h2>Overview</h2>
         </div>
-        <Button size="lg" onClick={() => navigate("scouting")}>
-          Start scouting →
+        <Button size="sm" onClick={() => navigate("scouting")}>
+          Start scouting
         </Button>
       </div>
       <div className="metrics-grid">
@@ -74,7 +84,10 @@ export default function Dashboard({
         <Card>
           <CardHeader>
             <CardTitle>
-              Top teams <span className="text-muted-foreground text-sm">by observed fuel</span>
+              Top teams{" "}
+              <span className="text-muted-foreground text-sm">
+                by observed fuel
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -88,12 +101,12 @@ export default function Dashboard({
                     className="team-summary"
                     onClick={() => navigate(`analytics:${team.team}`)}
                   >
-                    <span className="rank">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="rank">{index + 1}</span>
                     <div>
                       <h3>Team {team.team}</h3>
                       <p>
-                        {event?.teams.find((info) => info.number === team.team)?.name ??
-                          `${team.matches} matches observed`}
+                        {event?.teams.find((info) => info.number === team.team)
+                          ?.name ?? `${team.matches} matches observed`}
                       </p>
                     </div>
                     <div className="team-summary-stats">
@@ -109,7 +122,9 @@ export default function Dashboard({
                 ))}
             </div>
             {!stats.some((team) => team.matches) && (
-              <p className="empty">Save or import objective reports to see the strongest teams.</p>
+              <p className="empty">
+                Save or import objective reports to see the strongest teams.
+              </p>
             )}
           </CardContent>
         </Card>
@@ -140,7 +155,9 @@ export default function Dashboard({
             </div>
             <p className="text-sm">
               Average combined match score:{" "}
-              <b>{(allianceAverage("red") + allianceAverage("blue")).toFixed(1)}</b>
+              <b>
+                {(allianceAverage("red") + allianceAverage("blue")).toFixed(1)}
+              </b>
             </p>
             <div className="space-y-3 text-xs">
               {Object.entries({
@@ -162,7 +179,9 @@ export default function Dashboard({
                   <b className="red-team">
                     {completed.length
                       ? Math.round(
-                          (completed.filter((match) => match.redScore! > match.blueScore!).length /
+                          (completed.filter(
+                            (match) => match.redScore! > match.blueScore!,
+                          ).length /
                             completed.length) *
                             100,
                         )
@@ -173,7 +192,9 @@ export default function Dashboard({
                   <b className="blue-team">
                     {completed.length
                       ? Math.round(
-                          (completed.filter((match) => match.blueScore! > match.redScore!).length /
+                          (completed.filter(
+                            (match) => match.blueScore! > match.redScore!,
+                          ).length /
                             completed.length) *
                             100,
                         )
@@ -198,7 +219,9 @@ export default function Dashboard({
         ))}
       </div>
       {!upcoming.length && (
-        <p className="empty">No upcoming matches in the cache. Refresh the event in Lead desk.</p>
+        <p className="empty">
+          No upcoming matches in the cache. Refresh the event in Lead desk.
+        </p>
       )}
     </div>
   );

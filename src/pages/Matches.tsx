@@ -20,7 +20,6 @@ export default function Matches({ session }: { session: Session }) {
     <div className="space-y-5">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">The field, in order</p>
           <h2>Match schedule</h2>
           <p>Alliances, results, and your team's matches.</p>
         </div>

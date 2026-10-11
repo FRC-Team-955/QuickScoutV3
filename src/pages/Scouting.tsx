@@ -42,7 +42,8 @@ export default function Scouting({
     if (session.preferredMatchId) setMatchId(session.preferredMatchId);
   }, [session.preferredMatchId]);
   useEffect(() => {
-    if (!session.schedule.some((match) => match.id === matchId)) setMatchId(session.schedule[0]?.id ?? "");
+    if (!session.schedule.some((match) => match.id === matchId))
+      setMatchId(session.schedule[0]?.id ?? "");
     setOverride("");
   }, [session.eventKey, session.schedule, matchId]);
 
@@ -59,7 +60,10 @@ export default function Scouting({
               ...current.draft,
               values: {
                 ...current.draft.values,
-                [key]: typeof value === "function" ? value(current.draft.values[key] ?? "") : value,
+                [key]:
+                  typeof value === "function"
+                    ? value(current.draft.values[key] ?? "")
+                    : value,
               },
             },
           }
@@ -78,7 +82,12 @@ export default function Scouting({
           : match
             ? suggestTeam(current, match, mode)
             : null;
-      if (!current.name.trim() || !assigned || !Number.isInteger(assigned) || assigned < 1)
+      if (
+        !current.name.trim() ||
+        !assigned ||
+        !Number.isInteger(assigned) ||
+        assigned < 1
+      )
         throw new Error("A scout name and valid team are required.");
       if (!pit && (!match || !match.teams.includes(assigned)))
         throw new Error("Choose a team from this match.");
@@ -105,7 +114,9 @@ export default function Scouting({
               {draft.mode} ·{" "}
               {draft.matchId
                 ? matchLabel(
-                    session.schedule.find((match) => match.id === draft.matchId) ?? {
+                    session.schedule.find(
+                      (match) => match.id === draft.matchId,
+                    ) ?? {
                       id: draft.matchId,
                       number: 0,
                       teams: [],
@@ -125,7 +136,8 @@ export default function Scouting({
         </div>
         {(draft.eventKey ?? "demo") !== session.eventKey && (
           <p className="notice">
-            This draft belongs to {draft.eventKey ?? "demo"}. Its event stays attached when saved.
+            This draft belongs to {draft.eventKey ?? "demo"}. Its event stays
+            attached when saved.
           </p>
         )}
         <Card>
@@ -149,15 +161,23 @@ export default function Scouting({
                 </select>
               </label>
             )}
-            <ReportForm draft={{ ...draft, values }} update={update} language={session.language} />
+            <ReportForm
+              draft={{ ...draft, values }}
+              update={update}
+              language={session.language}
+            />
             <div className="form-actions">
               <Button
                 size="lg"
                 disabled={saving}
                 onClick={() => {
                   void change((current) => {
-                    if (current.draft?.id !== draft.id) throw new Error("This draft is no longer active.");
-                    return submitDraft({ ...current, draft: { ...current.draft, values } });
+                    if (current.draft?.id !== draft.id)
+                      throw new Error("This draft is no longer active.");
+                    return submitDraft({
+                      ...current,
+                      draft: { ...current.draft, values },
+                    });
                   }).then((saved) => {
                     if (saved) setSubmitted(true);
                   });
@@ -172,7 +192,9 @@ export default function Scouting({
                 onClick={() => {
                   if (cancel)
                     void change((current) =>
-                      current.draft?.id === draft.id ? { ...current, draft: null } : current,
+                      current.draft?.id === draft.id
+                        ? { ...current, draft: null }
+                        : current,
                     );
                   else setCancel(true);
                 }}
@@ -190,13 +212,19 @@ export default function Scouting({
   const suggested = match ? suggestTeam(session, match, mode) : null;
   const teams =
     session.events[session.eventKey]?.teams ??
-    [...new Set(session.schedule.flatMap((match) => match.teams))].map((number) => ({
-      number,
-      name: `Team ${number}`,
-    }));
+    [...new Set(session.schedule.flatMap((match) => match.teams))].map(
+      (number) => ({
+        number,
+        name: `Team ${number}`,
+      }),
+    );
   const scouted = new Set(
     session.reports
-      .filter((report) => report.mode === "pit" && (report.eventKey ?? "demo") === session.eventKey)
+      .filter(
+        (report) =>
+          report.mode === "pit" &&
+          (report.eventKey ?? "demo") === session.eventKey,
+      )
       .map((report) => report.team),
   );
   return (
@@ -209,26 +237,38 @@ export default function Scouting({
       )}
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{pit ? "Know the robot" : "Scouting station"}</p>
-          <h2>{pit ? "Pit scouting" : "Ready for the next match?"}</h2>
+          <h2>{pit ? "Pit scouting" : "Match scouting"}</h2>
           <p>
             {pit
               ? "Record capabilities and autos before the match."
-              : "Pick the match. We suggest a team. You scout."}
+              : "Choose a match and scouting mode."}
           </p>
         </div>
-        <span className="pill">{session.offline ? "Offline collection" : "Local queue preview"}</span>
+        <span className="pill">
+          {session.offline ? "Offline collection" : "Local queue preview"}
+        </span>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>{pit ? "Start an interview" : "Your next assignment"}</CardTitle>
+          <CardTitle>
+            {pit ? "Start an interview" : "Your next assignment"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {!session.name.trim() && <p className="text-amber-300">Set your scout name above to begin.</p>}
+          {!session.name.trim() && (
+            <p className="text-amber-300">
+              Set your scout name above to begin.
+            </p>
+          )}
           {pit ? (
             <label className="block space-y-2 max-w-xs">
               Team number
-              <Input type="number" min={1} value={team} onChange={(event) => setTeam(event.target.value)} />
+              <Input
+                type="number"
+                min={1}
+                value={team}
+                onChange={(event) => setTeam(event.target.value)}
+              />
             </label>
           ) : (
             <>
@@ -242,7 +282,9 @@ export default function Scouting({
                       setOverride("");
                     }}
                   >
-                    {item === "objective" ? "Objective · counts" : "Subjective · observations"}
+                    {item === "objective"
+                      ? "Objective · counts"
+                      : "Subjective · observations"}
                   </button>
                 ))}
               </div>
@@ -263,16 +305,26 @@ export default function Scouting({
               <div className="assignment">
                 <span>Suggested team</span>
                 <strong>
-                  {override ? `Team ${override}` : suggested ? `Team ${suggested}` : "No uncovered team"}
+                  {override
+                    ? `Team ${override}`
+                    : suggested
+                      ? `Team ${suggested}`
+                      : "No uncovered team"}
                 </strong>
                 <div className="alliance-line">
                   {match?.teams.map((number, index) => (
-                    <span key={`${index}-${number}`} className={index < 3 ? "red-team" : "blue-team"}>
+                    <span
+                      key={`${index}-${number}`}
+                      className={index < 3 ? "red-team" : "blue-team"}
+                    >
                       {number}
                     </span>
                   ))}
                 </div>
-                <p>Balanced using your scout ID and local coverage. Shared claims are pending.</p>
+                <p>
+                  Balanced using your scout ID and local coverage. Shared claims
+                  are pending.
+                </p>
               </div>
               <details className="text-sm text-muted-foreground">
                 <summary>Manual fallback</summary>
@@ -297,7 +349,9 @@ export default function Scouting({
             disabled={
               saving ||
               !session.name.trim() ||
-              (pit ? !/^\d+$/.test(team) || Number(team) < 1 : !suggested && !override)
+              (pit
+                ? !/^\d+$/.test(team) || Number(team) < 1
+                : !suggested && !override)
             }
             onClick={() => ready()}
           >
@@ -333,11 +387,17 @@ export default function Scouting({
                   </button>
                 ))}
             </div>
-            {!teams.length && <p className="empty">Load an event in Lead desk to get its team list.</p>}
+            {!teams.length && (
+              <p className="empty">
+                Load an event in Lead desk to get its team list.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <Todo title="Shared Ready queue">Server claims, lead overrides, and assignment delivery.</Todo>
+        <Todo title="Shared Ready queue">
+          Server claims, lead overrides, and assignment delivery.
+        </Todo>
       )}
     </div>
   );

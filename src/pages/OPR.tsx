@@ -14,7 +14,6 @@ export default function OPR({ session, change }: { session: Session; change: Cha
     <div className="space-y-5">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Alliance results → team estimates</p>
           <h2>Offensive power rating</h2>
           <p>Estimated contribution to the alliance score. Early schedules produce uncertain estimates.</p>
         </div>

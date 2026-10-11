@@ -57,7 +57,6 @@ export default function Lead({
     <div className="space-y-5">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Keep the team moving</p>
           <h2>Lead desk</h2>
           <p>Event setup, local queue, coverage, and data transfer.</p>
         </div>

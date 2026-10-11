@@ -108,7 +108,6 @@ export default function Analytics({
     <div className="space-y-5">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">From observations to decisions</p>
           <h2>{team ? `Team ${team}` : "Scouting analytics"}</h2>
           <p>Saved and imported reports · fuel counts are separate from game points.</p>
         </div>

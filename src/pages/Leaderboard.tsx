@@ -14,7 +14,6 @@ export default function Leaderboard({ session }: { session: Session }) {
     <div className="space-y-5">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Every report helps</p>
           <h2>Scout leaderboard</h2>
           <p>Counts saved and imported reports. Pending reports count here too.</p>
         </div>
