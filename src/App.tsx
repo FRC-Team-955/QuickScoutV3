@@ -13,6 +13,11 @@ import PitDisplay from "./pages/PitDisplay";
 import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
 import { download } from "./lib/transfer";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./lib/firebase";
+import type { User } from "firebase/auth";
+import { signOut } from "firebase/auth";
+import AuthPanel from "./components/AuthPanel";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -34,7 +39,18 @@ export default function App() {
   const [tab, setTab] = useState(route);
   const [network, setNetwork] = useState(navigator.onLine);
   const [message, setMessage] = useState("");
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const source = useEvent(session, change, network);
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    console.log(
+      currentUser ? `Signed in as ${currentUser.email}` : "Signed out"
+    );
+    setUser(currentUser);
+  });
+
+  return unsubscribe;
+}, []);
   useEffect(() => {
     const update = () => setNetwork(navigator.onLine);
     const navigate = () => setTab(route());
@@ -47,6 +63,15 @@ export default function App() {
       window.removeEventListener("hashchange", navigate);
     };
   }, []);
+
+  if (user === undefined) {
+    return <p>Checking sign-in…</p>;
+  }
+
+  if (user === null) {
+    return <AuthPanel />;
+  }
+
   if (!session)
     return (
       <main className="shell py-12">
@@ -90,20 +115,21 @@ export default function App() {
             </p>
             <h1>{event?.name ?? "Demo event"}</h1>
           </div>
-          <label className="scout-identity">
-            <div>
-              <small>Scout name</small>
-              <Input
-                aria-label="Scout name"
-                placeholder="Your name"
-                defaultValue={session.name}
-                onChange={(event) => {
-                  const name = event.target.value;
-                  void change((current) => ({ ...current, name }));
-                }}
-              />
-            </div>
-          </label>
+
+          <div>
+           <p className="eyebrow">{user.displayName ?? user.email}</p>
+          <Button
+          variant="outline"
+          onClick={() => {
+            void signOut(auth).catch(() => {
+              setMessage("Could not sign out. Try again.");
+            });
+          }}
+        >
+          Sign out
+        </Button>
+        </div>
+
         </header>
         <div className="status-strip">
           <div className="shell status-content">
@@ -131,6 +157,7 @@ export default function App() {
           </div>
         </div>
         <main className="shell app-content">
+
           <div className="event-freshness">
             <span>
               {event?.updatedAt
