@@ -13,10 +13,10 @@ import PitDisplay from "./pages/PitDisplay";
 import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
 import { download } from "./lib/transfer";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, reload, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./lib/firebase";
 import type { User } from "firebase/auth";
-import { signOut } from "firebase/auth";
+import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
@@ -40,6 +40,7 @@ export default function App() {
   const [network, setNetwork] = useState(navigator.onLine);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [emailVerified, setEmailVerified] = useState(false);
   const source = useEvent(session, change, network);
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -47,6 +48,7 @@ export default function App() {
       currentUser ? `Signed in as ${currentUser.email}` : "Signed out"
     );
     setUser(currentUser);
+    setEmailVerified(currentUser?.emailVerified ?? false);
   });
 
   return unsubscribe;
@@ -70,6 +72,44 @@ export default function App() {
 
   if (user === null) {
     return <AuthPanel />;
+  }
+
+  if (!emailVerified) {
+    return (
+      <main className="mx-auto max-w-sm p-6 space-y-4">
+        <h1>Verify your school email</h1>
+        <p>We need to confirm that you own {user.email}.</p>
+
+
+        <div className="flex flex-wrap gap-3">
+        <Button
+          onClick={() => {
+            void sendEmailVerification(user)
+              .then(() => setMessage("Verification email sent. Check your inbox."))
+              .catch(() => setMessage("Could not send the email. Try again."));
+          }}
+        >
+          Send verification email
+        </Button>
+        <Button
+          onClick={async () => {
+            try {
+              await reload(user);
+              await user.getIdToken(true);
+              setEmailVerified(user.emailVerified);
+              setMessage(user.emailVerified ? "" : "Email is not verified yet.");
+            } catch {
+              setMessage("Could not check verification. Try again.");
+            }
+          }}
+        >
+          I've verified
+        </Button>
+        </div>
+
+        <p role="status">{message}</p>
+      </main>
+    );
   }
 
   if (!session)
