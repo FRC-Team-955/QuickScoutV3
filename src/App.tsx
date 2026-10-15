@@ -13,7 +13,7 @@ import PitDisplay from "./pages/PitDisplay";
 import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
 import { download } from "./lib/transfer";
-import { onAuthStateChanged, reload, signInWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, reload } from "firebase/auth";
 import { auth } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
@@ -41,6 +41,7 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationBusy, setVerificationBusy] = useState(false);
   const source = useEvent(session, change, network);
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -49,6 +50,7 @@ export default function App() {
     );
     setUser(currentUser);
     setEmailVerified(currentUser?.emailVerified ?? false);
+    setMessage("");
   });
 
   return unsubscribe;
@@ -66,6 +68,18 @@ export default function App() {
     };
   }, []);
 
+  async function handleSignOut() {
+    setVerificationBusy(true);
+    try {
+      await signOut(auth);
+      setMessage("");
+    } catch {
+      setMessage("Could not sign out. Try again.");
+    } finally {
+      setVerificationBusy(false);
+    }
+  }
+
   if (user === undefined) {
     return <p>Checking sign-in…</p>;
   }
@@ -74,25 +88,49 @@ export default function App() {
     return <AuthPanel />;
   }
 
-  if (!emailVerified) {
+  if (!/^[^@]+@student[.]csd509j[.]net$/.test(user.email ?? "")) {
     return (
       <main className="mx-auto max-w-sm p-6 space-y-4">
+        <h1>Use your school account</h1>
+        <p>Sign in with your @student.csd509j.net email to use QuickScout.</p>
+        <Button disabled={verificationBusy} onClick={() => void handleSignOut()}>
+          Use a different account
+        </Button>
+        <p role="status">{message}</p>
+      </main>
+    );
+  }
+
+  if (!emailVerified) {
+    return (
+      <main className="mx-auto max-w-lg p-6 space-y-4">
         <h1>Verify your school email</h1>
         <p>We need to confirm that you own {user.email}.</p>
 
 
         <div className="flex flex-wrap gap-3">
         <Button
-          onClick={() => {
-            void sendEmailVerification(user)
-              .then(() => setMessage("Verification email sent. Check your inbox."))
-              .catch(() => setMessage("Could not send the email. Try again."));
+          disabled={verificationBusy}
+          onClick={async () => {
+            setVerificationBusy(true);
+            setMessage("Sending verification email…");
+            try {
+              await sendEmailVerification(user);
+              setMessage("Verification email sent. Check your inbox.");
+            } catch {
+              setMessage("Could not send the email. Try again.");
+            } finally {
+              setVerificationBusy(false);
+            }
           }}
         >
           Send verification email
         </Button>
         <Button
+          disabled={verificationBusy}
           onClick={async () => {
+            setVerificationBusy(true);
+            setMessage("Checking verification…");
             try {
               await reload(user);
               await user.getIdToken(true);
@@ -100,11 +138,21 @@ export default function App() {
               setMessage(user.emailVerified ? "" : "Email is not verified yet.");
             } catch {
               setMessage("Could not check verification. Try again.");
+            } finally {
+              setVerificationBusy(false);
             }
           }}
         >
           I've verified
         </Button>
+        <Button
+          disabled={verificationBusy}
+          onClick={() => void handleSignOut()}
+        >
+          Cancel
+        </Button>
+
+
         </div>
 
         <p role="status">{message}</p>
@@ -160,11 +208,8 @@ export default function App() {
            <p className="eyebrow">{user.displayName ?? user.email}</p>
           <Button
           variant="outline"
-          onClick={() => {
-            void signOut(auth).catch(() => {
-              setMessage("Could not sign out. Try again.");
-            });
-          }}
+          disabled={verificationBusy}
+          onClick={() => void handleSignOut()}
         >
           Sign out
         </Button>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
 export default function AuthPanel() {
@@ -47,10 +47,10 @@ export default function AuthPanel() {
     }
     }
 
-    
+
 
   return (
-    <section className="mx-auto max-w-sm p-6 space-y-3">
+    <section className="mx-auto max-w-lg p-6 space-y-3">
       <h3>Create your scout account</h3>
 
       <label className="block">
@@ -82,7 +82,7 @@ export default function AuthPanel() {
     disabled={busy}
     onClick={() => void createAccount()}
     >
-    {busy ? "Creating…" : "Create account"}
+    Create account
     </Button>
 
 
@@ -94,6 +94,32 @@ export default function AuthPanel() {
     >
     Sign in
     </Button>
+
+    <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            const address = email.trim().toLowerCase();
+            if (!address.endsWith("@student.csd509j.net")) {
+              setMessage("Use your school email.");
+              return;
+            }
+
+            setBusy(true);
+            setMessage("Sending reset email…");
+            try {
+              await sendPasswordResetEmail(auth, address);
+              setMessage("If an account exists for this email, check your inbox for a reset link.");
+            } catch {
+              setMessage("Failed to send reset message.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Forgot password?
+        </Button>
 </div>
 
 
