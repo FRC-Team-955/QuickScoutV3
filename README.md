@@ -1,6 +1,6 @@
 # QuickScout V3
 
-React + TypeScript, with one local IndexedDB store and a future Firebase sync layer.
+React + TypeScript
 
 ```sh
 npm ci
