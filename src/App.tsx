@@ -18,8 +18,9 @@ import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import BrosNotLead from "./pages/BrosNotLead";
+import { Console } from "console";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -46,6 +47,7 @@ export default function App() {
   const [roleError, setRoleError] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
   const source = useEvent(session, change, network);
 
   async function checkLead(currentUser: User) {
@@ -75,6 +77,19 @@ export default function App() {
 
   return unsubscribe;
 }, []);
+
+useEffect(() => {
+  if (!user || !session || saving) return;
+
+  const name = user.displayName ?? user.email ?? "";
+  if (session.name === name) return;
+
+  void change((current) => ({
+    ...current,
+    name,
+  }));
+}, [user, session, saving, change]);
+
   useEffect(() => {
     const update = () => setNetwork(navigator.onLine);
     const navigate = () => setTab(route());
@@ -416,6 +431,35 @@ export default function App() {
             <Todo title="Offline app startup">
               Cache the app shell and apply updates between scouting sessions.
             </Todo>
+            <Button
+              onClick={async ()=>{ setUploadBusy(true);
+                try{
+                const id = session.outbox.at(0);
+                if (!id){console.log("no more reports"); return;}
+                const report = session.reports.find((report) => report.id === id)
+                if (!report) return;
+                const fff =doc(db,"reports/"+String(id));
+                
+                const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
+                  ...report,
+                  ownerUid: user.uid,
+                };
+                await setDoc(fff, uploadReport);
+
+                change((current)=>({
+                  ...current,
+                  outbox: current.outbox.filter((idn)=>idn!=id)
+                }));
+                } catch {
+                      console.log("shiii");
+                      
+                }
+                finally { setUploadBusy(false);}
+              }}
+              disabled={uploadBusy}
+            >
+                Push demo report!
+            </Button>
           </div>
           <footer className="app-footer">
             <span>QuickScout V3</span>

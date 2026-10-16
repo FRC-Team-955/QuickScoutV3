@@ -255,11 +255,7 @@ export default function Scouting({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {!session.name.trim() && (
-            <p className="text-amber-300">
-              Set your scout name above to begin.
-            </p>
-          )}
+          
           {pit ? (
             <label className="block space-y-2 max-w-xs">
               Team number
@@ -348,7 +344,6 @@ export default function Scouting({
             size="lg"
             disabled={
               saving ||
-              !session.name.trim() ||
               (pit
                 ? !/^\d+$/.test(team) || Number(team) < 1
                 : !suggested && !override)
