@@ -54,11 +54,12 @@ export default function App() {
     setIsLead(undefined);
     if(currentUser != null){
       try{
-      const snapshot = (await getDoc(doc(db,"users/"+user?.uid)));
+      const snapshot = (await getDoc(doc(db,"users/"+currentUser?.uid)));
       if(snapshot.data()?.role === "lead"){
         setIsLead(true);
       } else {
       setEmailVerified(currentUser?.emailVerified ?? false);
+      setIsLead(false);
       }
       setMessage("");
       } catch {
@@ -94,6 +95,10 @@ export default function App() {
     }
   }
 
+if (user === null) {
+    return <AuthPanel />;
+  }
+
   if (user === undefined) {
     return <p>Checking sign-in…</p>;
   }
@@ -101,9 +106,7 @@ export default function App() {
     return <p>Checking lead status…</p>;
   }
 
-  if (user === null) {
-    return <AuthPanel />;
-  }
+  
 
   if (!/^[^@]+@student[.]csd509j[.]net$/.test(user.email ?? "")) {
     return (
