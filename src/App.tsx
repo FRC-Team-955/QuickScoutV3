@@ -14,10 +14,11 @@ import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
 import { download } from "./lib/transfer";
 import { onAuthStateChanged, reload } from "firebase/auth";
-import { auth } from "./lib/firebase";
+import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
+import { getFirestore, doc, getDocsFromServer, getDoc } from "firebase/firestore";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -40,16 +41,23 @@ export default function App() {
   const [network, setNetwork] = useState(navigator.onLine);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [isLead, setIsLead] = useState<true | false | undefined>(undefined);
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const source = useEvent(session, change, network);
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
     console.log(
       currentUser ? `Signed in as ${currentUser.email}` : "Signed out"
     );
     setUser(currentUser);
+    setIsLead(undefined);
+    var snapshot = (await getDoc(doc(db,"users/UnEBTkHWH1NVk4JvJTu9BiLBaWU2")));
+    if(snapshot.data()?.role === "lead"){
+      setEmailVerified(true);
+    } else {
     setEmailVerified(currentUser?.emailVerified ?? false);
+    }
     setMessage("");
   });
 
