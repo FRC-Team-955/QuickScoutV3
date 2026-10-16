@@ -407,14 +407,37 @@ useEffect(() => {
               </Button>
               <Button
                 variant="outline"
-                disabled={!session.outbox.length}
-                onClick={() =>
-                  setMessage(
-                    "Firebase upload is TODO. Your reports remain queued locally.",
-                  )
+                disabled={!session.outbox.length || uploadBusy}
+                onClick={async ()=>{ setUploadBusy(true);
+                try{
+                  for (const id of session.outbox) {
+                    if (!id){console.log("no more reports"); return;}
+                    const report = session.reports.find((report) => report.id === id)
+                    if (!report) return;
+                    const fff =doc(db,"reports/"+String(id));
+                    
+                    const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
+                      ...report,
+                      ownerUid: user.uid,
+                    };
+                    await setDoc(fff, uploadReport);
+
+
+                    const saved = await change((current) => ({
+                      ...current,
+                      outbox: current.outbox.filter((pendingId) => pendingId !== id),
+                    }));
+
+                    if (!saved) return;
+                  }
+                } catch {
+                      console.log("shiii");
+                      
                 }
+                finally { setUploadBusy(false);}
+              }}
               >
-                Sync pending reports
+                {session.outbox.length? "Sync pending reports" : "All reports synced"}
               </Button>
             </div>
             {message && (
@@ -431,35 +454,7 @@ useEffect(() => {
             <Todo title="Offline app startup">
               Cache the app shell and apply updates between scouting sessions.
             </Todo>
-            <Button
-              onClick={async ()=>{ setUploadBusy(true);
-                try{
-                const id = session.outbox.at(0);
-                if (!id){console.log("no more reports"); return;}
-                const report = session.reports.find((report) => report.id === id)
-                if (!report) return;
-                const fff =doc(db,"reports/"+String(id));
-                
-                const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
-                  ...report,
-                  ownerUid: user.uid,
-                };
-                await setDoc(fff, uploadReport);
-
-                change((current)=>({
-                  ...current,
-                  outbox: current.outbox.filter((idn)=>idn!=id)
-                }));
-                } catch {
-                      console.log("shiii");
-                      
-                }
-                finally { setUploadBusy(false);}
-              }}
-              disabled={uploadBusy}
-            >
-                Push demo report!
-            </Button>
+            
           </div>
           <footer className="app-footer">
             <span>QuickScout V3</span>
