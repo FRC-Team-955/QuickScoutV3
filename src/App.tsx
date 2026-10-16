@@ -19,6 +19,7 @@ import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
 import { doc, getDoc } from "firebase/firestore";
+import BrosNotLead from "./pages/BrosNotLead";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -351,7 +352,7 @@ export default function App() {
             {page === "pit-display" && (
               <PitDisplay session={session} change={change} network={network} />
             )}
-            {page === "lead" && (
+            {page === "lead" && (  isLead ? (
               <Lead
                 session={session}
                 change={change}
@@ -359,6 +360,7 @@ export default function App() {
                 network={network}
                 saving={saving}
               />
+            ) : (<BrosNotLead></BrosNotLead>)
             )}
           </Suspense>
           <section className="backup-strip">
