@@ -52,13 +52,19 @@ export default function App() {
     );
     setUser(currentUser);
     setIsLead(undefined);
-    var snapshot = (await getDoc(doc(db,"users/UnEBTkHWH1NVk4JvJTu9BiLBaWU2")));
-    if(snapshot.data()?.role === "lead"){
-      setEmailVerified(true);
-    } else {
-    setEmailVerified(currentUser?.emailVerified ?? false);
+    if(currentUser != null){
+      try{
+      const snapshot = (await getDoc(doc(db,"users/"+user?.uid)));
+      if(snapshot.data()?.role === "lead"){
+        setIsLead(true);
+      } else {
+      setEmailVerified(currentUser?.emailVerified ?? false);
+      }
+      setMessage("");
+      } catch {
+        setMessage("Could not check if you're lead or not. Try again.");
+      }
     }
-    setMessage("");
   });
 
   return unsubscribe;
@@ -90,6 +96,9 @@ export default function App() {
 
   if (user === undefined) {
     return <p>Checking sign-in…</p>;
+  }
+  if (isLead === undefined) {
+    return <p>Checking lead status…</p>;
   }
 
   if (user === null) {
