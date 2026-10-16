@@ -18,7 +18,7 @@ import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
-import { getFirestore, doc, getDocsFromServer, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -42,30 +42,34 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [isLead, setIsLead] = useState<true | false | undefined>(undefined);
+  const [roleError, setRoleError] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const source = useEvent(session, change, network);
+
+  async function checkLead(currentUser: User) {
+    setIsLead(undefined);
+    setRoleError("");
+    setMessage("");
+    try {
+      const snapshot = await getDoc(doc(db, "users", currentUser.uid));
+      setIsLead(snapshot.data()?.role === "lead");
+    } catch {
+      setRoleError("Could not check your permissions. Check your connection and retry.");
+    }
+  }
+
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
     console.log(
       currentUser ? `Signed in as ${currentUser.email}` : "Signed out"
     );
     setUser(currentUser);
     setIsLead(undefined);
-    if(currentUser != null){
-      try{
-      const snapshot = (await getDoc(doc(db,"users/"+currentUser?.uid)));
-      if(snapshot.data()?.role === "lead"){
-        setIsLead(true);
-      } else {
-      setEmailVerified(currentUser?.emailVerified ?? false);
-      setIsLead(false);
-      }
-      setMessage("");
-      } catch {
-        setMessage("Could not check if you're lead or not. Try again.");
-      }
-    }
+    setRoleError("");
+    setEmailVerified(currentUser?.emailVerified ?? false);
+    setMessage("");
+    if (currentUser) void checkLead(currentUser);
   });
 
   return unsubscribe;
@@ -95,7 +99,7 @@ export default function App() {
     }
   }
 
-if (user === null) {
+  if (user === null) {
     return <AuthPanel />;
   }
 
@@ -103,7 +107,27 @@ if (user === null) {
     return <p>Checking sign-in…</p>;
   }
   if (isLead === undefined) {
-    return <p>Checking lead status…</p>;
+    return (
+      <main className="mx-auto max-w-lg p-6 space-y-4">
+        <h1>{roleError ? "Permission check failed" : "Checking permissions…"}</h1>
+        {roleError && <p role="alert">{roleError}</p>}
+        <div className="flex flex-wrap gap-3">
+          {roleError && (
+            <Button disabled={verificationBusy} onClick={() => void checkLead(user)}>
+              Retry
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            disabled={verificationBusy}
+            onClick={() => void handleSignOut()}
+          >
+            Sign out
+          </Button>
+        </div>
+        {message && <p role="status">{message}</p>}
+      </main>
+    );
   }
 
   
@@ -121,7 +145,7 @@ if (user === null) {
     );
   }
 
-  if (!emailVerified) {
+  if (!isLead && !emailVerified){
     return (
       <main className="mx-auto max-w-lg p-6 space-y-4">
         <h1>Verify your school email</h1>
