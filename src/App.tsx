@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Wifi, WifiOff, ArrowDownToLine, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, ArrowDownToLine, RefreshCw, User, X } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import Todo from "./components/Todo";
@@ -113,6 +113,36 @@ useEffect(() => {
     } finally {
       setVerificationBusy(false);
     }
+  }
+
+  async function uploadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
+    setUploadBusy(true);
+                try{
+                  for (const id of session.outbox) {
+                    if (!id){console.log("no more reports"); return;}
+                    const report = session.reports.find((report) => report.id === id)
+                    if (!report) return;
+                    const fff =doc(db,"reports/"+String(id));
+                    
+                    const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
+                      ...report,
+                      ownerUid: user.uid,
+                    };
+                    await setDoc(fff, uploadReport);
+
+
+                    const saved = await change((current) => ({
+                      ...current,
+                      outbox: current.outbox.filter((pendingId) => pendingId !== id),
+                    }));
+
+                    if (!saved) return;
+                  }
+                } catch {
+                      console.log("shiii");
+                      
+                }
+                finally { setUploadBusy(false);}
   }
 
   if (user === null) {
@@ -389,6 +419,24 @@ useEffect(() => {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
+                disabled={(!session.reports.length) || saving}
+                onClick={async () => {
+                  setUploadBusy(true);
+                  const saved = await change((current) => ({
+                    ...current,
+                    reports: [],
+                    outbox: [],
+                  }));
+
+                  setMessage(saved ? "Deleted local reports." : "Could not delete local reports.");
+                  setUploadBusy(false);
+                }}
+              >
+                                <X />
+                Delete local reports
+              </Button>
+              <Button
+                variant="outline"
                 disabled={!session.reports.length || saving}
                 onClick={() => {
                   download(
@@ -408,36 +456,11 @@ useEffect(() => {
               <Button
                 variant="outline"
                 disabled={!session.outbox.length || uploadBusy}
-                onClick={async ()=>{ setUploadBusy(true);
-                try{
-                  for (const id of session.outbox) {
-                    if (!id){console.log("no more reports"); return;}
-                    const report = session.reports.find((report) => report.id === id)
-                    if (!report) return;
-                    const fff =doc(db,"reports/"+String(id));
-                    
-                    const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
-                      ...report,
-                      ownerUid: user.uid,
-                    };
-                    await setDoc(fff, uploadReport);
-
-
-                    const saved = await change((current) => ({
-                      ...current,
-                      outbox: current.outbox.filter((pendingId) => pendingId !== id),
-                    }));
-
-                    if (!saved) return;
-                  }
-                } catch {
-                      console.log("shiii");
-                      
-                }
-                finally { setUploadBusy(false);}
+                onClick={async ()=>{ uploadAll(session,user)
               }}
               >
-                {session.outbox.length? "Sync pending reports" : "All reports synced"}
+
+                {session.outbox.length? "Sync " + String(session.outbox.length)+ " pending reports" : "All reports synced"}
               </Button>
             </div>
             {message && (
