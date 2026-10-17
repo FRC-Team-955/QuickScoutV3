@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Wifi, WifiOff, ArrowDownToLine, RefreshCw, User, X } from "lucide-react";
+import { Wifi, WifiOff, ArrowDownToLine, RefreshCw, X } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import Todo from "./components/Todo";
@@ -124,11 +124,8 @@ useEffect(() => {
                     if (!report) return;
                     const fff =doc(db,"reports/"+String(id));
                     
-                    const uploadReport = { /// THIS IS BAD. THIS CLAIMS OWNERSHIP AS THE UPLOADER.....
-                      ...report,
-                      ownerUid: user.uid,
-                    };
-                    await setDoc(fff, uploadReport);
+                    
+                    await setDoc(fff, report);
 
 
                     const saved = await change((current) => ({
@@ -371,7 +368,7 @@ useEffect(() => {
               <Dashboard session={session} navigate={navigate} />
             )}
             {page === "scouting" && (
-              <Scouting session={session} change={change} saving={saving} />
+              <Scouting session={session} change={change} saving={saving} user={user.uid}/>
             )}
             {page === "pit" && (
               <Scouting
@@ -380,6 +377,7 @@ useEffect(() => {
                 change={change}
                 saving={saving}
                 pit
+                user={user.uid}
               />
             )}
             {page === "matches" && <Matches session={session} />}

@@ -15,11 +15,13 @@ export default function Scouting({
   change,
   saving,
   pit = false,
+  user,
 }: {
   session: Session;
   change: ChangeSession;
   saving: boolean;
   pit?: boolean;
+  user: string;
 }) {
   const [mode, setMode] = useState<Mode>("objective");
   const [matchId, setMatchId] = useState(
@@ -99,6 +101,7 @@ export default function Scouting({
           eventKey: current.eventKey,
           matchId: pit ? null : matchId,
           team: assigned,
+          ownerUid: user,
           values: {},
         },
       };

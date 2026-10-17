@@ -34,6 +34,7 @@ export type Draft = {
   team: number;
   values: Record<string, string | number>;
   eventKey?: string;
+  ownerUid: string;
 };
 export type Report = Draft & { scoutId: string; scoutName: string; submittedAt: number };
 export type Session = {
