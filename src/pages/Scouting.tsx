@@ -15,11 +15,13 @@ export default function Scouting({
   change,
   saving,
   pit = false,
+  user,
 }: {
   session: Session;
   change: ChangeSession;
   saving: boolean;
   pit?: boolean;
+  user: string;
 }) {
   const [mode, setMode] = useState<Mode>("objective");
   const [matchId, setMatchId] = useState(
@@ -99,6 +101,7 @@ export default function Scouting({
           eventKey: current.eventKey,
           matchId: pit ? null : matchId,
           team: assigned,
+          ownerUid: user,
           values: {},
         },
       };
@@ -255,11 +258,7 @@ export default function Scouting({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {!session.name.trim() && (
-            <p className="text-amber-300">
-              Set your scout name above to begin.
-            </p>
-          )}
+          
           {pit ? (
             <label className="block space-y-2 max-w-xs">
               Team number
@@ -348,7 +347,6 @@ export default function Scouting({
             size="lg"
             disabled={
               saving ||
-              !session.name.trim() ||
               (pit
                 ? !/^\d+$/.test(team) || Number(team) < 1
                 : !suggested && !override)

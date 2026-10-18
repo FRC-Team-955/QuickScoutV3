@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Wifi, WifiOff, ArrowDownToLine, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, ArrowDownToLine, RefreshCw, X } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import Todo from "./components/Todo";
@@ -12,12 +12,16 @@ import Leaderboard from "./pages/Leaderboard";
 import PitDisplay from "./pages/PitDisplay";
 import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
-import { download } from "./lib/transfer";
+import { download, validate } from "./lib/transfer";
 import { onAuthStateChanged, reload } from "firebase/auth";
-import { auth } from "./lib/firebase";
+import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import BrosNotLead from "./pages/BrosNotLead";
+import { Console } from "console";
+import {Report} from "./lib/model"
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -40,21 +44,54 @@ export default function App() {
   const [network, setNetwork] = useState(navigator.onLine);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [isLead, setIsLead] = useState<true | false | undefined>(undefined);
+  const [roleError, setRoleError] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const source = useEvent(session, change, network);
+
+  async function checkLead(currentUser: User) {
+    setIsLead(undefined);
+    setRoleError("");
+    setMessage("");
+    try {
+      const snapshot = await getDoc(doc(db, "users", currentUser.uid));
+      setIsLead(snapshot.data()?.role === "lead");
+    } catch {
+      setRoleError("Could not check your permissions. Check your connection and retry.");
+    }
+  }
+
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
     console.log(
       currentUser ? `Signed in as ${currentUser.email}` : "Signed out"
     );
     setUser(currentUser);
+    setIsLead(undefined);
+    setRoleError("");
     setEmailVerified(currentUser?.emailVerified ?? false);
     setMessage("");
+    if (currentUser) void checkLead(currentUser);
   });
 
   return unsubscribe;
 }, []);
+
+useEffect(() => {
+  if (!user || !session || saving) return;
+
+  const name = user.displayName ?? user.email ?? "";
+  if (session.name === name) return;
+
+  void change((current) => ({
+    ...current,
+    name,
+  }));
+}, [user, session, saving, change]);
+
   useEffect(() => {
     const update = () => setNetwork(navigator.onLine);
     const navigate = () => setTab(route());
@@ -80,13 +117,110 @@ export default function App() {
     }
   }
 
-  if (user === undefined) {
-    return <p>Checking sign-in…</p>;
+  async function uploadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
+    setUploadBusy(true);
+                try{
+                  for (const id of session.outbox) {
+                    if (!id){console.log("no more reports"); return;}
+                    const report = session.reports.find((report) => report.id === id)
+                    if (!report) return;
+                    const fff =doc(db,"reports/"+String(id));
+                    
+                    
+                    await setDoc(fff, report);
+
+
+                    const saved = await change((current) => ({
+                      ...current,
+                      outbox: current.outbox.filter((pendingId) => pendingId !== id),
+                    }));
+
+                    if (!saved) return;
+
+                    const saved2 = await change((current) => ({
+                      ...current,
+                      lastSync: Date.now()
+                    }));
+                  }
+                } catch (error) {
+                  console.error("Sync failed:", error);
+                  setMessage(
+                    error instanceof Error ? error.message : String(error)
+                  );
+                }
+                finally { setUploadBusy(false);}
+  }
+
+  async function downloadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
+    setDownloadBusy(true);
+                try{
+                  
+                    const collectiond = collection(db,"reports");
+
+                    if (!collectiond) return;
+
+                    const fff = (await getDocs(collectiond)).docs; //elite levels of not knowing what to call your vars
+
+                    // outbox unchanged. local reports = outbox + server stuff. if Id clash USE LOCAL
+                    const downloaded = fff.map((snapshot) => ({
+                      ...snapshot.data(),
+                      id: snapshot.id,
+
+                    }));
+                    const reports: Report[] = downloaded.map(validate);
+                    const local_additions = reports.filter((testReport) => session.reports.filter((idx)=>idx == testReport.id).length == 0); //remove locals from stuff thats going to be appended
+                    
+
+                    const saved = await change((current) => ({
+                      ...current,
+                      reports: current.reports.filter((testReport) => current.outbox.filter((idx)=>idx == testReport.id).length >= 1).concat(local_additions),
+                    }));
+
+                    if (!saved) return;
+
+
+                  
+                } catch (error) {
+                  console.error("Sync failed:", error);
+                  setMessage(
+                    error instanceof Error ? error.message : String(error)
+                  );
+                }
+                finally { setDownloadBusy(false);}
   }
 
   if (user === null) {
     return <AuthPanel />;
   }
+
+  if (user === undefined) {
+    return <p>Checking sign-in…</p>;
+  }
+  if (isLead === undefined) {
+    return (
+      <main className="mx-auto max-w-lg p-6 space-y-4">
+        <h1>{roleError ? "Permission check failed" : "Checking permissions…"}</h1>
+        {roleError && <p role="alert">{roleError}</p>}
+        <div className="flex flex-wrap gap-3">
+          {roleError && (
+            <Button disabled={verificationBusy} onClick={() => void checkLead(user)}>
+              Retry
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            disabled={verificationBusy}
+            onClick={() => void handleSignOut()}
+          >
+            Sign out
+          </Button>
+        </div>
+        {message && <p role="status">{message}</p>}
+      </main>
+    );
+  }
+
+  
 
   if (!/^[^@]+@student[.]csd509j[.]net$/.test(user.email ?? "")) {
     return (
@@ -101,7 +235,7 @@ export default function App() {
     );
   }
 
-  if (!emailVerified) {
+  if (!isLead && !emailVerified){
     return (
       <main className="mx-auto max-w-lg p-6 space-y-4">
         <h1>Verify your school email</h1>
@@ -223,8 +357,16 @@ export default function App() {
               {network ? "Network available" : "No network"}
             </span>
             <span>Firebase: not connected</span>
+            <Button
+                variant="outline"
+                disabled={downloadBusy}
+                onClick={async ()=>{ downloadAll(session,user)
+              }}
+            >
+              Sync
+            </Button>
             <span>
-              Last sync:{" "}
+              Last push sync:{" "}
               {session.lastSync
                 ? new Date(session.lastSync).toLocaleString()
                 : "never"}
@@ -281,7 +423,7 @@ export default function App() {
               <Dashboard session={session} navigate={navigate} />
             )}
             {page === "scouting" && (
-              <Scouting session={session} change={change} saving={saving} />
+              <Scouting session={session} change={change} saving={saving} user={user.uid}/>
             )}
             {page === "pit" && (
               <Scouting
@@ -290,6 +432,7 @@ export default function App() {
                 change={change}
                 saving={saving}
                 pit
+                user={user.uid}
               />
             )}
             {page === "matches" && <Matches session={session} />}
@@ -307,7 +450,7 @@ export default function App() {
             {page === "pit-display" && (
               <PitDisplay session={session} change={change} network={network} />
             )}
-            {page === "lead" && (
+            {page === "lead" && (  isLead ? (
               <Lead
                 session={session}
                 change={change}
@@ -315,6 +458,7 @@ export default function App() {
                 network={network}
                 saving={saving}
               />
+            ) : (<BrosNotLead></BrosNotLead>)
             )}
           </Suspense>
           <section className="backup-strip">
@@ -326,6 +470,24 @@ export default function App() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={(!session.reports.length) || saving}
+                onClick={async () => {
+                  setUploadBusy(true);
+                  const saved = await change((current) => ({
+                    ...current,
+                    reports: [],
+                    outbox: [],
+                  }));
+
+                  setMessage(saved ? "Deleted local reports." : "Could not delete local reports.");
+                  setUploadBusy(false);
+                }}
+              >
+                                <X />
+                Delete local reports
+              </Button>
               <Button
                 variant="outline"
                 disabled={!session.reports.length || saving}
@@ -346,14 +508,12 @@ export default function App() {
               </Button>
               <Button
                 variant="outline"
-                disabled={!session.outbox.length}
-                onClick={() =>
-                  setMessage(
-                    "Firebase upload is TODO. Your reports remain queued locally.",
-                  )
-                }
+                disabled={!session.outbox.length || uploadBusy}
+                onClick={async ()=>{ uploadAll(session,user)
+              }}
               >
-                Sync pending reports
+
+                {session.outbox.length? "Sync " + String(session.outbox.length)+ " pending reports" : "All reports synced"}
               </Button>
             </div>
             {message && (
@@ -370,6 +530,7 @@ export default function App() {
             <Todo title="Offline app startup">
               Cache the app shell and apply updates between scouting sessions.
             </Todo>
+            
           </div>
           <footer className="app-footer">
             <span>QuickScout V3</span>
