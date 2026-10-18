@@ -12,15 +12,16 @@ import Leaderboard from "./pages/Leaderboard";
 import PitDisplay from "./pages/PitDisplay";
 import { useSession } from "./lib/use-session";
 import { useEvent } from "./lib/use-event";
-import { download } from "./lib/transfer";
+import { download, validate } from "./lib/transfer";
 import { onAuthStateChanged, reload } from "firebase/auth";
 import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import BrosNotLead from "./pages/BrosNotLead";
 import { Console } from "console";
+import {Report} from "./lib/model"
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -48,6 +49,7 @@ export default function App() {
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const source = useEvent(session, change, network);
 
   async function checkLead(currentUser: User) {
@@ -134,12 +136,57 @@ useEffect(() => {
                     }));
 
                     if (!saved) return;
+
+                    const saved2 = await change((current) => ({
+                      ...current,
+                      lastSync: Date.now()
+                    }));
                   }
-                } catch {
-                      console.log("shiii");
-                      
+                } catch (error) {
+                  console.error("Sync failed:", error);
+                  setMessage(
+                    error instanceof Error ? error.message : String(error)
+                  );
                 }
                 finally { setUploadBusy(false);}
+  }
+
+  async function downloadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
+    setDownloadBusy(true);
+                try{
+                  
+                    const collectiond = collection(db,"reports");
+
+                    if (!collectiond) return;
+
+                    const fff = (await getDocs(collectiond)).docs; //elite levels of not knowing what to call your vars
+
+                    // outbox unchanged. local reports = outbox + server stuff. if Id clash USE LOCAL
+                    const downloaded = fff.map((snapshot) => ({
+                      ...snapshot.data(),
+                      id: snapshot.id,
+
+                    }));
+                    const reports: Report[] = downloaded.map(validate);
+                    const local_additions = reports.filter((testReport) => session.reports.filter((idx)=>idx == testReport.id).length == 0); //remove locals from stuff thats going to be appended
+                    
+
+                    const saved = await change((current) => ({
+                      ...current,
+                      reports: current.reports.filter((testReport) => current.outbox.filter((idx)=>idx == testReport.id).length >= 1).concat(local_additions),
+                    }));
+
+                    if (!saved) return;
+
+
+                  
+                } catch (error) {
+                  console.error("Sync failed:", error);
+                  setMessage(
+                    error instanceof Error ? error.message : String(error)
+                  );
+                }
+                finally { setDownloadBusy(false);}
   }
 
   if (user === null) {
@@ -310,8 +357,16 @@ useEffect(() => {
               {network ? "Network available" : "No network"}
             </span>
             <span>Firebase: not connected</span>
+            <Button
+                variant="outline"
+                disabled={downloadBusy}
+                onClick={async ()=>{ downloadAll(session,user)
+              }}
+            >
+              Sync
+            </Button>
             <span>
-              Last sync:{" "}
+              Last push sync:{" "}
               {session.lastSync
                 ? new Date(session.lastSync).toLocaleString()
                 : "never"}

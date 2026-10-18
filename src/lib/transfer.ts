@@ -11,9 +11,10 @@ function flatten(value: unknown, prefix = ""): Record<string, string | number> {
   }
   return values;
 }
-function validate(report: unknown): Report {
+export function validate(report: unknown): Report {
   const r = record(report);
   if (
+    typeof r.ownerUid !== "string" || !r.ownerUid ||
     typeof r.id !== "string" ||
     !r.id ||
     typeof r.scoutId !== "string" ||
@@ -48,6 +49,7 @@ function validate(report: unknown): Report {
     eventKey: r.eventKey as string | undefined,
     submittedAt: r.submittedAt,
     values: r.values as Report["values"],
+    ownerUid: r.ownerUid
   };
 }
 
