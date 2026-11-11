@@ -115,7 +115,7 @@ export default function AuthPanel() {
             disabled={busy}
             onClick={async () => {
               const address = email.trim().toLowerCase();
-              if (!address.endsWith("@student.csd509j.net")) {
+              if (!address.endsWith(".net")) {
                 setMessage("Use your school email.");
                 return;
               }

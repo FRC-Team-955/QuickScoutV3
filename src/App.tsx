@@ -67,17 +67,25 @@ export default function App() {
 
   useEffect(() => {
   const stuff = () => {
-    const collectiond = collection(db,"reports");
-
-    if (collectiond){
-        setFbconnected(true);
-    } else {
-      setFbconnected(false);
+    console.log("HERE");
+    
+    if (!network) {
+      setFbconnected(false); 
+      return;
+    }
+    
+    try { 
+      const collectiond = collection(db, "reports"); 
+      setFbconnected(true);
+    } catch { 
+      setFbconnected(false); 
     }
   };
 
-  return stuff;
-}, [network]);
+  stuff(); 
+
+}, [network, db]); 
+
 
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -371,7 +379,7 @@ useEffect(() => {
               {network ? <Wifi size={15} /> : <WifiOff size={15} />}
               {network ? "Network available" : "No network"}
             </span>
-            <span>Firebase: {fbconnected? "connected" : "notconnected"}</span>
+            <span>Firebase: {fbconnected? "connected" : "not connected"}</span>
             <Button
                 variant="outline"
                 disabled={downloadBusy}
