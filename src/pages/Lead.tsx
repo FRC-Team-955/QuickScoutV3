@@ -142,8 +142,8 @@ export default function Lead({
               <strong>{session.offline ? "Offline collection" : "Online collection"}</strong>
               <p>
                 {session.offline
-                  ? "Save locally. API refreshes and streams stay paused."
-                  : "API refreshes available. Firebase upload remains TODO."}
+                  ? "Save locally. Firebase sync, API refreshes, and streams stay paused."
+                  : "Firebase sync and API refreshes available when connected."}
               </p>
             </div>
             <Button

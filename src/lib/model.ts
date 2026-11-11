@@ -43,6 +43,7 @@ export type Session = {
   name: string;
   offline: boolean;
   lastSync: number | null;
+  roleCache?: Record<string, { lead: boolean; checkedAt: number }>;
   schedule: Match[];
   draft: Draft | null;
   reports: Report[];

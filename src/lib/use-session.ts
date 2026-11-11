@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { changeSession } from "./storage";
 import type { Session } from "./model";
 
@@ -14,7 +14,7 @@ export function useSession() {
       .catch((error) => setError(String(error)));
   }, []);
 
-  async function change(update: (current: Session) => Session) {
+  const change = useCallback(async (update: (current: Session) => Session) => {
     writes.current++;
     setSaving(true);
     try {
@@ -28,7 +28,7 @@ export function useSession() {
       writes.current--;
       setSaving(writes.current > 0);
     }
-  }
+  }, []);
 
   return { session, change, error, saving };
 }

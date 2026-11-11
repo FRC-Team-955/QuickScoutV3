@@ -1,7 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Wifi, WifiOff, ArrowDownToLine, RefreshCw, X } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
 import Todo from "./components/Todo";
 import Scouting from "./pages/Scouting";
 import Dashboard from "./pages/Dashboard";
@@ -18,10 +17,10 @@ import { auth, db } from "./lib/firebase";
 import type { User } from "firebase/auth";
 import { signOut, sendEmailVerification } from "firebase/auth";
 import AuthPanel from "./components/AuthPanel";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDocFromServer, getDocsFromServer, setDoc, disableNetwork, enableNetwork } from "firebase/firestore";
 import BrosNotLead from "./pages/BrosNotLead";
-import { Console } from "console";
-import {Report} from "./lib/model"
+import type { Report, Session } from "./lib/model";
+import { mergeDownloadedReports, withTimeout } from "./lib/sync";
 const Analytics = lazy(() => import("./pages/Analytics"));
 const tabs = [
   { id: "dashboard", label: "Overview" },
@@ -42,50 +41,76 @@ export default function App() {
   const { session, change, error, saving } = useSession();
   const [tab, setTab] = useState(route);
   const [network, setNetwork] = useState(navigator.onLine);
-  const [fbconnected, setFbconnected] = useState(false);
+  const [lastServerContact, setLastServerContact] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [isLead, setIsLead] = useState<true | false | undefined>(undefined);
   const [roleError, setRoleError] = useState("");
+  const [roleRetry, setRoleRetry] = useState(0);
+  const [usingSavedRole, setUsingSavedRole] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(false);
   const source = useEvent(session, change, network);
 
-  async function checkLead(currentUser: User) {
-    setIsLead(undefined);
-    setRoleError("");
-    setMessage("");
-    try {
-      const snapshot = await getDoc(doc(db, "users", currentUser.uid));
-      setIsLead(snapshot.data()?.role === "lead");
-    } catch {
-      setRoleError("Could not check your permissions. Check your connection and retry.");
-    }
-  }
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const transferBusy = useRef(false);
+  const sessionReady = session !== null;
 
   useEffect(() => {
-  const stuff = () => {
-    console.log("HERE");
-    
-    if (!network) {
-      setFbconnected(false); 
-      return;
+    if (!sessionReady) return;
+    const request = network && !session?.offline ? enableNetwork(db) : disableNetwork(db);
+    void request.catch(() => setMessage("Could not change Firebase network mode."));
+  }, [network, session?.offline, sessionReady]);
+
+  useEffect(() => {
+    if (!user || !sessionReady) return;
+    const currentUser = user;
+    const cached = sessionRef.current?.roleCache?.[currentUser.uid];
+    let cancelled = false;
+    setRoleError("");
+    setUsingSavedRole(!!cached);
+    setIsLead(cached?.lead);
+
+    function useSavedRole() {
+      if (cancelled) return;
+      if (cached) {
+        setIsLead(cached.lead);
+        setUsingSavedRole(true);
+      } else if (currentUser.emailVerified) {
+        // Verified scouts can collect locally without a role document.
+        setIsLead(false);
+      } else {
+        setRoleError("Connect once to check this account's permissions. Local reports are safe.");
+      }
     }
-    
-    try { 
-      const collectiond = collection(db, "reports"); 
-      setFbconnected(true);
-    } catch { 
-      setFbconnected(false); 
+
+    if (!network || session?.offline) {
+      useSavedRole();
+      return () => { cancelled = true; };
     }
-  };
 
-  stuff(); 
-
-}, [network, db]); 
-
+    async function checkRole() {
+      try {
+        const snapshot = await withTimeout(getDocFromServer(doc(db, "users", currentUser.uid)));
+        if (cancelled || auth.currentUser?.uid !== currentUser.uid) return;
+        const lead = snapshot.data()?.role === "lead";
+        setIsLead(lead);
+        setUsingSavedRole(false);
+        setLastServerContact(Date.now());
+        await change((current) => ({
+          ...current,
+          roleCache: { ...current.roleCache, [currentUser.uid]: { lead, checkedAt: Date.now() } },
+        }));
+      } catch {
+        useSavedRole();
+      }
+    }
+    void checkRole();
+    return () => { cancelled = true; };
+  }, [user, network, session?.offline, sessionReady, roleRetry, change]);
 
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -97,7 +122,8 @@ export default function App() {
     setRoleError("");
     setEmailVerified(currentUser?.emailVerified ?? false);
     setMessage("");
-    if (currentUser) void checkLead(currentUser);
+    setUsingSavedRole(false);
+    setLastServerContact(null);
   });
 
   return unsubscribe;
@@ -140,76 +166,58 @@ useEffect(() => {
     }
   }
 
-  async function uploadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
-    setUploadBusy(true);
-                try{
-                  for (const id of session.outbox) {
-                    if (!id){console.log("no more reports"); return;}
-                    const report = session.reports.find((report) => report.id === id)
-                    if (!report) return;
-                    const fff =doc(db,"reports/"+String(id));
-                    
-                    
-                    await setDoc(fff, report);
-
-
-                    const saved = await change((current) => ({
-                      ...current,
-                      outbox: current.outbox.filter((pendingId) => pendingId !== id),
-                    }));
-
-                    if (!saved) return;
-
-                    const saved2 = await change((current) => ({
-                      ...current,
-                      lastSync: Date.now()
-                    }));
-                  }
-                } catch (error) {
-                  console.error("Sync failed:", error);
-                  setMessage(
-                    error instanceof Error ? error.message : String(error)
-                  );
-                }
-                finally { setUploadBusy(false);}
+  function canTransfer(uid: string) {
+    return navigator.onLine && !!sessionRef.current && !sessionRef.current.offline
+      && auth.currentUser?.uid === uid;
   }
 
-  async function downloadAll(session: { outbox: any; reports: any[]; }, user: { uid: any; }) {
+  async function uploadAll(snapshot: Session, account: User) {
+    if (transferBusy.current || !canTransfer(account.uid)) return;
+    transferBusy.current = true;
+    setUploadBusy(true);
+    setMessage("");
+    try {
+      for (const id of snapshot.outbox) {
+        if (!canTransfer(account.uid)) break;
+        const report = sessionRef.current?.reports.find((report) => report.id === id);
+        if (!report) throw new Error("A queued report is missing. Export a backup before repairing the queue.");
+        await withTimeout(setDoc(doc(db, "reports", id), report));
+        setLastServerContact(Date.now());
+        const saved = await change((current) => ({
+          ...current,
+          outbox: current.outbox.filter((pendingId) => pendingId !== id),
+          lastSync: Date.now(),
+        }));
+        if (!saved) return;
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      transferBusy.current = false;
+      setUploadBusy(false);
+    }
+  }
+
+  async function downloadAll(account: User) {
+    if (transferBusy.current || !canTransfer(account.uid)) return;
+    transferBusy.current = true;
     setDownloadBusy(true);
-                try{
-                  
-                    const collectiond = collection(db,"reports");
-
-                    if (!collectiond) return;
-
-                    const fff = (await getDocs(collectiond)).docs; //elite levels of not knowing what to call your vars
-
-                    // outbox unchanged. local reports = outbox + server stuff. if Id clash USE LOCAL
-                    const downloaded = fff.map((snapshot) => ({
-                      ...snapshot.data(),
-                      id: snapshot.id,
-
-                    }));
-                    const reports: Report[] = downloaded.map(validate);
-                    const local_additions = reports.filter((testReport) => session.reports.filter((idx)=>idx == testReport.id).length == 0); //remove locals from stuff thats going to be appended
-                    
-
-                    const saved = await change((current) => ({
-                      ...current,
-                      reports: current.reports.filter((testReport) => current.outbox.filter((idx)=>idx == testReport.id).length >= 1).concat(local_additions),
-                    }));
-
-                    if (!saved) return;
-
-
-                  
-                } catch (error) {
-                  console.error("Sync failed:", error);
-                  setMessage(
-                    error instanceof Error ? error.message : String(error)
-                  );
-                }
-                finally { setDownloadBusy(false);}
+    setMessage("");
+    try {
+      // Never replace local data with an empty or partial offline cache response.
+      const snapshot = await withTimeout(getDocsFromServer(collection(db, "reports")));
+      if (!canTransfer(account.uid)) return;
+      setLastServerContact(Date.now());
+      const reports: Report[] = snapshot.docs.map((document) =>
+        validate({ ...document.data(), id: document.id }),
+      );
+      await change((current) => current.offline ? current : mergeDownloadedReports(current, reports));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      transferBusy.current = false;
+      setDownloadBusy(false);
+    }
   }
 
   if (user === null) {
@@ -224,6 +232,49 @@ useEffect(() => {
   
 
   
+
+  if (!session)
+    return (
+      <main className="shell py-12">
+        <h1>QuickScout V3</h1>
+        <p role={error ? "alert" : "status"}>
+          {error || "Opening local storage…"}
+        </p>
+      </main>
+    );
+
+  if (isLead === undefined) {
+    return (
+      <main className="mx-auto max-w-lg p-6 space-y-4">
+        <h1>{roleError ? "Permissions unavailable" : "Checking permissions…"}</h1>
+        {roleError && <p role="alert">{roleError}</p>}
+        <div className="flex flex-wrap gap-3">
+          {roleError && network && !session?.offline && (
+            <Button onClick={() => setRoleRetry((current) => current + 1)}>Retry</Button>
+          )}
+          {session?.offline && roleError && (
+            <Button onClick={() => void change((current) => ({ ...current, offline: false }))}>
+              Return to online collection
+            </Button>
+          )}
+          <Button variant="outline" disabled={verificationBusy} onClick={() => void handleSignOut()}>
+            Sign out
+          </Button>
+        </div>
+        <p role="status">{message}</p>
+      </main>
+    );
+  }
+
+  if (!isLead && !/^[^@]+@student[.]csd509j[.]net$/.test(user.email ?? "")) {
+    return (
+      <main className="mx-auto max-w-lg p-6 space-y-4">
+        <h1>Use your school account</h1>
+        <Button variant="outline" onClick={() => void handleSignOut()}>Use a different account</Button>
+        <p role="status">{message}</p>
+      </main>
+    );
+  }
 
   if (!isLead && !emailVerified){
     return (
@@ -284,15 +335,6 @@ useEffect(() => {
     );
   }
 
-  if (!session)
-    return (
-      <main className="shell py-12">
-        <h1>QuickScout V3</h1>
-        <p role={error ? "alert" : "status"}>
-          {error || "Opening local storage…"}
-        </p>
-      </main>
-    );
   const page = tab.split(":")[0];
   const navigate = (page: string) => {
     window.location.hash = page;
@@ -346,11 +388,13 @@ useEffect(() => {
               {network ? <Wifi size={15} /> : <WifiOff size={15} />}
               {network ? "Network available" : "No network"}
             </span>
-            <span>Firebase: {fbconnected? "connected" : "not connected"}</span>
+            <span>Firebase: {session.offline ? "paused" : !network ? "no network" : lastServerContact
+              ? `last reached ${new Date(lastServerContact).toLocaleTimeString()}` : "not checked"}</span>
+            {usingSavedRole && <span>Using saved permissions</span>}
             <Button
                 variant="outline"
-                disabled={downloadBusy}
-                onClick={async ()=>{ downloadAll(session,user)
+                disabled={downloadBusy || uploadBusy || !network || session.offline}
+                onClick={async ()=>{ downloadAll(user)
               }}
             >
               Sync
@@ -462,7 +506,7 @@ useEffect(() => {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                disabled={(!session.reports.length) || saving}
+                disabled={!session.reports.length || saving || uploadBusy || downloadBusy}
                 onClick={async () => {
                   setUploadBusy(true);
                   const saved = await change((current) => ({
@@ -498,7 +542,7 @@ useEffect(() => {
               </Button>
               <Button
                 variant="outline"
-                disabled={!session.outbox.length || uploadBusy || !network}
+                disabled={!session.outbox.length || uploadBusy || downloadBusy || !network || session.offline}
                 onClick={async ()=>{ uploadAll(session,user)
               }}
               >
