@@ -219,44 +219,11 @@ useEffect(() => {
   if (user === undefined) {
     return <p>Checking sign-in…</p>;
   }
-  if (isLead === undefined) {
-    return (
-      <main className="mx-auto max-w-lg p-6 space-y-4">
-        <h1>{roleError ? "Permission check failed" : "Checking permissions…"}</h1>
-        {roleError && <p role="alert">{roleError}</p>}
-        <div className="flex flex-wrap gap-3">
-          {roleError && (
-            <Button disabled={verificationBusy} onClick={() => void checkLead(user)}>
-              Retry
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            disabled={verificationBusy}
-            onClick={() => void handleSignOut()}
-          >
-            Sign out
-          </Button>
-        </div>
-        {message && <p role="status">{message}</p>}
-      </main>
-    );
-  }
+  
 
   
 
-  if (!/^[^@]+@student[.]csd509j[.]net$/.test(user.email ?? "")) {
-    return (
-      <main className="mx-auto max-w-sm p-6 space-y-4">
-        <h1>Use your school account</h1>
-        <p>Sign in with your @student.csd509j.net email to use QuickScout.</p>
-        <Button disabled={verificationBusy} onClick={() => void handleSignOut()}>
-          Use a different account
-        </Button>
-        <p role="status">{message}</p>
-      </main>
-    );
-  }
+  
 
   if (!isLead && !emailVerified){
     return (
@@ -531,12 +498,12 @@ useEffect(() => {
               </Button>
               <Button
                 variant="outline"
-                disabled={!session.outbox.length || uploadBusy}
+                disabled={!session.outbox.length || uploadBusy || !network}
                 onClick={async ()=>{ uploadAll(session,user)
               }}
               >
 
-                {session.outbox.length? "Sync " + String(session.outbox.length)+ " pending reports" : "All reports synced"}
+                {session.outbox.length? "Sync " + String(session.outbox.length)+ " pending reports" : "All reports synced. YAY!"}
               </Button>
             </div>
             {message && (
