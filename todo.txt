@@ -1,0 +1,8 @@
+DONE 1. Firebase auth & durable sync: Sign-in, scout/lead permissions, and uploading saved reports. Uploads need safe retries and server confirmation before leaving the pending queue.
+2. Offline app startup: Let the app open without internet
+3. Shared Ready queue: Make “Ready” reserve a team across everyone’s devices, preventing two scouts from accidentally claiming the same assignment. Currently, suggestions use local data.
+4. Shared queue & scout roster: Let the lead publish schedules, override assignments, and see everyone’s availability, last contact, last sync, and pending reports. Currently, the lead sees only this device.
+5. Event-wide offline switch: Distribute the lead’s collection-mode choice. Currently, each device switches separately. Disconnected scouts would receive the change when they reconnect.
+6. Shared analytics: Pull everyone’s reports from Firebase and coordinate edits/deletions with permissions. Currently, analytics uses locally saved or imported reports.
+7. QR / nearby transfer: Move report batches between devices without internet, keeping report IDs so repeated transfers don’t duplicate records. File export/import already works.
+8. Storage migrations & recovery: Safely upgrade older local data formats and handle storage failures. Multi-tab coordination is also unfinished; currently, use one tab per device.
