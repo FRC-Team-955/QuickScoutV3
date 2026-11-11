@@ -42,6 +42,7 @@ export default function App() {
   const { session, change, error, saving } = useSession();
   const [tab, setTab] = useState(route);
   const [network, setNetwork] = useState(navigator.onLine);
+  const [fbconnected, setFbconnected] = useState(false);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [isLead, setIsLead] = useState<true | false | undefined>(undefined);
@@ -63,6 +64,20 @@ export default function App() {
       setRoleError("Could not check your permissions. Check your connection and retry.");
     }
   }
+
+  useEffect(() => {
+  const stuff = () => {
+    const collectiond = collection(db,"reports");
+
+    if (collectiond){
+        setFbconnected(true);
+    } else {
+      setFbconnected(false);
+    }
+  };
+
+  return stuff;
+}, [network]);
 
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -356,7 +371,7 @@ useEffect(() => {
               {network ? <Wifi size={15} /> : <WifiOff size={15} />}
               {network ? "Network available" : "No network"}
             </span>
-            <span>Firebase: not connected</span>
+            <span>Firebase: {fbconnected? "connected" : "notconnected"}</span>
             <Button
                 variant="outline"
                 disabled={downloadBusy}
@@ -523,19 +538,13 @@ useEffect(() => {
             )}
           </section>
           <div className="grid gap-3 lg:grid-cols-2">
-            <Todo title="Firebase auth & durable sync">
-              Sign-in, report batches, retry acknowledgments, and server
-              permissions.
-            </Todo>
+           
             <Todo title="Offline app startup">
               Cache the app shell and apply updates between scouting sessions.
             </Todo>
             
           </div>
-          <footer className="app-footer">
-            <span>QuickScout V3</span>
-            <span>Prototype · saved on this device</span>
-          </footer>
+          
         </main>
       </div>
     </div>
