@@ -1,10 +1,22 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import { fileURLToPath } from "node:url";
-import { VitePWA } from 'vite-plugin-pwa'
+import path from "path";
 
-export default defineConfig({
-  plugins: [react(), VitePWA({ registerType: 'autoUpdate' })],
-  resolve: { alias: { "@": fileURLToPath(new URL("/QuickScoutV3/src/", import.meta.url)) } },
-  test: { include: ["src/**/*.test.ts"] },
-});
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
+  base: "/QuickScoutV3",
+  server: {
+    host: "::",
+    port: 8080,
+    hmr: {
+      overlay: false,
+    },
+  },
+  plugins: [react(), mode === "development",
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+}));
